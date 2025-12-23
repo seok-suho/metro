@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Advanced Metronome</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #111827;
+      --card-border: rgba(255,255,255,0.06);
+      --primary: #6366f1;
+      --primary-soft: rgba(99,102,241,0.15);
+      --text-main: #e5e7eb;
+      --text-sub: #9ca3af;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(1200px 600px at 20% 10%, #1e1b4b, transparent), var(--bg);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0)) , var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 26px 28px 30px;
+      width: 340px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 30px 80px rgba(0,0,0,0.65);
+      animation: fadeUp 0.6s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      text-align: center;
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: white;
+    }
+
+    .bpm {
+      text-align: center;
+      font-size: 52px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    .bpm::after {
+      content: ' BPM';
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-sub);
+      margin-left: 4px;
+    }
+
+    input[type=range] {
+      width: 100%;
+      margin-top: 6px;
+      accent-color: var(--primary);
+    }
+
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 16px;
+      gap: 10px;
+    }
+
+    button, select {
+      flex: 1;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      background: rgba(255,255,255,0.04);
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    button:hover, select:hover {
+      background: rgba(255,255,255,0.08);
+    }
+
+    button.active {
+      background: var(--primary);
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 10px 30px var(--primary-soft);
+    }
+
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: var(--text-sub);
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎵 Advanced Metronome</h1>
+
+    <div class="bpm" id="bpmLabel">120</div>
+    <input type="range" min="40" max="240" value="120" id="bpmSlider" />
+
+    <div class="row">
+      <button id="startBtn">Start</button>
+      <button id="tapBtn">Tap</button>
+    </div>
+
+    <div class="row">
+      <select id="timeSig">
+        <option value="4">4/4</option>
+        <option value="3">3/4</option>
+        <option value="2">2/4</option>
+      </select>
+      <select id="accent">
+        <option value="on">강박 On</option>
+        <option value="off">강박 Off</option>
+      </select>
+    </div>
+
+    <div class="footer">Musicca+ 연습 특화 메트로놈</div>
+  </div>
+
+<script>
+  // 오디오 컨텍스트
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioContext();
+
+  let isRunning = false;
+  let bpm = 120;
+  let intervalId = null;
+  let beat = 0;
+
+  const bpmLabel = document.getElementById('bpmLabel');
+  const bpmSlider = document.getElementById('bpmSlider');
+  const startBtn = document.getElementById('startBtn');
+  const tapBtn = document.getElementById('tapBtn');
+  const timeSig = document.getElementById('timeSig');
+  const accent = document.getElementById('accent');
+
+  bpmSlider.oninput = () => {
+    bpm = bpmSlider.value;
+    bpmLabel.textContent = bpm;
+    if (isRunning) restart();
+  };
+
+  function clickSound(isAccent) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc.frequency.value = isAccent ? 1200 : 800;
+    gain.gain.value = 0.5;
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.05);
+  }
+
+  function tick() {
+    const beatsPerBar = parseInt(timeSig.value);
+    const useAccent = accent.value === 'on';
+
+    clickSound(useAccent && beat === 0);
+    beat = (beat + 1) % beatsPerBar;
+  }
+
+  function start() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const interval = 60000 / bpm;
+    intervalId = setInterval(tick, interval);
+    isRunning = true;
+    startBtn.textContent = 'Stop';
+    startBtn.classList.add('active');
+  }
+
+  function stop() {
+    clearInterval(intervalId);
+    intervalId = null;
+    isRunning = false;
+    beat = 0;
+    startBtn.textContent = 'Start';
+    startBtn.classList.remove('active');
+  }
+
+  function restart() {
+    stop();
+    start();
+  }
+
+  startBtn.onclick = () => {
+    isRunning ? stop() : start();
+  };
+
+  // Tap Tempo
+  let lastTap = 0;
+  tapBtn.onclick = () => {
+    const now = Date.now();
+    if (lastTap) {
+      const diff = now - lastTap;
+      bpm = Math.round(60000 / diff);
+      bpm = Math.min(240, Math.max(40, bpm));
+      bpmSlider.value = bpm;
+      bpmLabel.textContent = bpm;
+      if (isRunning) restart();
+    }
+    lastTap = now;
+  };
+</script>
+</body>
+</html>
